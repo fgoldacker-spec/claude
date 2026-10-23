@@ -21,17 +21,18 @@ android {
 }
 
 // Wrap the shared game page into a full HTML document for the WebView.
+def gameDir = layout.buildDirectory.dir('generated/game').get().asFile
 def gameAsset = tasks.register('gameAsset') {
     def src = rootProject.file('../game/blockdoku.html')
-    def out = layout.buildDirectory.dir('generated/game')
     inputs.file src
-    outputs.dir out
+    outputs.dir gameDir
     doLast {
-        def f = out.get().file('index.html').asFile
-        f.parentFile.mkdirs()
-        f.text = '<!doctype html><html lang="de"><head><meta charset="utf-8">' +
-                 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">' +
-                 '</head><body>\n' + src.text + '\n</body></html>\n'
+        gameDir.mkdirs()
+        new File(gameDir, 'index.html').text =
+            '<!doctype html><html lang="de"><head><meta charset="utf-8">' +
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">' +
+            '</head><body>\n' + src.text + '\n</body></html>\n'
     }
 }
-android.sourceSets.main.assets.srcDir(gameAsset)
+android.sourceSets.main.assets.srcDirs += gameDir
+tasks.named('preBuild') { dependsOn gameAsset }
