@@ -3,19 +3,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600&display=swap">
 <style>
-/* Layout: one-screen app — score bar, 9×9 sudoku board, tray of three pieces. Single dark "night slate" look. */
+/* Layout: one-screen app — score bar, 9×9 sudoku board, tray of three pieces. Single dark high-contrast look: bright tiles, alternating 3×3 boxes. */
 :root {
-  --bg: #0e1430;
-  --board: #19214d;
-  --cell-a: #222c62;
-  --cell-b: #161d45;
-  --line: #3b4787;
-  --block: #f4b740;
-  --block-hi: #ffd57a;
-  --block-lo: #c98a17;
-  --ink: #e9ecff;
-  --muted: #8f99c9;
-  --good: #5fe3a4;
+  --bg: #0b1029;
+  --board: #050817;
+  --cell-a: #4a59ad;
+  --cell-b: #323e80;
+  --cell-edge: #6f7fd0;
+  --block: #ffc93c;
+  --block-hi: #ffe28a;
+  --block-lo: #d99a0f;
+  --block-edge: #6b4a00;
+  --ink: #ffffff;
+  --muted: #cfd6f5;
+  --good: #3dff9e;
   --bad: #ff7a7a;
   --font-display: "Bungee", "Arial Black", system-ui, sans-serif;
   --font-body: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -36,59 +37,59 @@ body {
   --size: min(100vw - 32px, 100vh - 260px, 480px);
 }
 .bar { width: var(--size); display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.brand { font-family: var(--font-display); font-size: 1.15rem; letter-spacing: .04em; color: var(--block); }
+.brand { font-family: var(--font-display); font-size: 1.35rem; letter-spacing: .04em; color: var(--block); }
 .stat { display: flex; flex-direction: column; align-items: flex-end; }
-.stat small { font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
-.stat b { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.stat.best b { font-size: 1rem; color: var(--muted); }
+.stat small { font-size: .9rem; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.stat b { font-family: var(--font-display); font-weight: 400; font-size: 2rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat.best b { font-size: 1.3rem; color: var(--muted); }
 .stats { display: flex; gap: 18px; align-items: flex-end; }
 .board-wrap { position: relative; }
 .board {
   width: var(--size); height: var(--size); max-width: 100%;
-  display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; padding: 4px; box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; padding: 5px; box-sizing: border-box;
   background: var(--board); border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .35);
 }
-.cell { border-radius: 3px; background: var(--cell-a); position: relative; }
-.cell.alt { background: var(--cell-b); }
+.cell { border-radius: 4px; background: var(--cell-a); position: relative; box-shadow: inset 0 0 0 1px var(--cell-edge); }
+.cell.alt { background: var(--cell-b); box-shadow: inset 0 0 0 1px var(--cell-a); }
 .cell.filled, .pc {
   background: linear-gradient(145deg, var(--block-hi), var(--block) 45%, var(--block-lo));
-  box-shadow: inset 0 -2px 0 rgb(0 0 0 / .18);
+  box-shadow: inset 0 0 0 2px var(--block-edge);
 }
-.cell.ghost { background: color-mix(in srgb, var(--block) 45%, var(--cell-a)); }
-.cell.willclear { outline: 2px solid var(--good); outline-offset: -2px; }
+.cell.ghost { background: color-mix(in srgb, var(--block) 70%, var(--cell-a)); box-shadow: inset 0 0 0 2px var(--block-hi); }
+.cell.willclear { outline: 4px solid var(--good); outline-offset: -4px; }
 .cell.pop::after {
   content: ""; position: absolute; inset: 0; border-radius: 3px;
   background: var(--block-hi); animation: pop .38s ease-out forwards;
 }
 @keyframes pop { from { transform: scale(1); opacity: 1; } to { transform: scale(.2); opacity: 0; } }
 .tray { width: var(--size); max-width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 120px; max-height: 170px; }
-.slot { display: grid; place-items: center; border-radius: 12px; background: rgb(255 255 255 / .03); cursor: grab; }
-.slot.dead .piece { opacity: .3; }
-.piece { display: grid; gap: 2px; pointer-events: none; }
+.slot { display: grid; place-items: center; border-radius: 12px; background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); cursor: grab; }
+.slot.dead .piece { opacity: .3; filter: grayscale(1); }
+.piece { display: grid; gap: 3px; pointer-events: none; }
 .piece .pc, .piece .pe { width: var(--pc, 20px); height: var(--pc, 20px); border-radius: 3px; }
 .slot.dragging .piece { visibility: hidden; }
-.float { position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none; display: grid; gap: 2px; filter: drop-shadow(0 8px 12px rgb(0 0 0 / .45)); }
+.float { position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none; display: grid; gap: 3px; filter: drop-shadow(0 8px 12px rgb(0 0 0 / .45)); }
 .float .pc, .float .pe { border-radius: 3px; }
 .toast {
   position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
-  font-family: var(--font-display); font-size: 1.7rem; color: var(--good); text-shadow: 0 3px 0 rgb(0 0 0 / .4);
+  font-family: var(--font-display); font-size: 2rem; color: var(--good); text-shadow: 0 3px 0 rgb(0 0 0 / .4);
   pointer-events: none; animation: rise 1s ease-out forwards; white-space: nowrap;
 }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -110%); } }
 .over {
   position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px;
-  background: rgb(14 20 48 / .86); backdrop-filter: blur(2px);
+  background: rgb(5 8 23 / .92); backdrop-filter: blur(2px);
 }
 .over-card { text-align: center; display: grid; gap: 10px; padding: 16px; }
 .over h2 { margin: 0; font-family: var(--font-display); font-weight: 400; color: var(--block); font-size: 1.8rem; }
-.over p { margin: 0; color: var(--muted); }
+.over p { margin: 0; color: var(--ink); font-size: 1.2rem; }
 button {
-  font: 600 1rem var(--font-body); color: var(--bg); background: var(--block); border: 0; border-radius: 999px;
+  font: 600 1.15rem var(--font-body); color: var(--bg); background: var(--block); border: 0; border-radius: 999px;
   padding: 12px 26px; cursor: pointer; box-shadow: 0 4px 0 var(--block-lo);
 }
 button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--block-lo); }
 button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outline-offset: 2px; }
-.ghost-btn { background: transparent; color: var(--muted); box-shadow: none; padding: 6px 10px; font-size: .85rem; }
+.ghost-btn { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--muted); padding: 8px 14px; font-size: 1rem; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .cell.pop::after, .toast { animation-duration: .01s; } }
 </style>
 
@@ -234,7 +235,7 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
       slot.dataset.i = i;
       if (s) {
         const [h, w] = dims(s);
-        const size = Math.max(10, Math.min(22, Math.floor((slotW - 24) / Math.max(w, h, 3)) - 2));
+        const size = Math.max(10, Math.min(26, Math.floor((slotW - 24) / Math.max(w, h, 3)) - 2));
         const p = document.createElement('div');
         p.className = 'piece';
         pieceGrid(s, p, size);
