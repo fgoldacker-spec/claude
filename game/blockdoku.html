@@ -89,6 +89,7 @@ button {
 }
 button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--block-lo); }
 button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outline-offset: 2px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .ghost-btn { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--muted); padding: 8px 14px; font-size: 1rem; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .cell.pop::after, .toast { animation-duration: .01s; } }
 </style>
@@ -97,7 +98,10 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
   <div class="bar">
     <div>
       <div class="brand">BLOCKDOKU</div>
-      <button class="ghost-btn" id="restart" type="button">Neues Spiel</button>
+      <div class="btns">
+        <button class="ghost-btn" id="restart" type="button">Neues Spiel</button>
+        <button class="ghost-btn" id="sound" type="button" aria-pressed="true">Ton an</button>
+      </div>
     </div>
     <div class="stats">
       <div class="stat best"><small>Rekord</small><b id="best">0</b></div>
@@ -151,8 +155,62 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
   }
   const dims = s => [Math.max(...s.map(p => p[0])) + 1, Math.max(...s.map(p => p[1])) + 1];
 
+  // --- Sounds (synthesized with Web Audio, no files needed) ---
+  let soundOn = true;
+  try { soundOn = localStorage.getItem('blockdoku-sound') !== 'off'; } catch {}
+  let ac = null, master = null;
+  function audio() {
+    if (!soundOn) return null;
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 0.55;
+      master.connect(ac.destination);
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(freq, at = 0, dur = 0.15, type = 'sine', vol = 0.5, slideTo = 0) {
+    const a = audio();
+    if (!a) return;
+    const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const semi = (f, n) => f * Math.pow(2, n / 12);
+  const sfx = {
+    pick() { tone(660, 0, 0.05, 'sine', 0.2); },
+    back() { tone(300, 0, 0.12, 'sine', 0.25, 200); },
+    place() { tone(190, 0, 0.12, 'triangle', 0.7, 110); tone(950, 0, 0.03, 'square', 0.06); },
+    deal() { [523, 659, 784].forEach((f, k) => tone(f, 0.25 + k * 0.08, 0.12, 'sine', 0.3)); },
+    clear(units, combo) {
+      // Rising arpeggio: longer for more units, higher for longer combos.
+      const base = semi(523.25, Math.min(combo - 1, 6) * 2);
+      const steps = [0, 4, 7, 12, 16, 19, 24].slice(0, 3 + Math.min(units, 4));
+      steps.forEach((n, k) => tone(semi(base, n), 0.06 + k * 0.07, 0.22, 'triangle', 0.45));
+      if (combo > 1) tone(semi(base, 28), 0.08 + steps.length * 0.07, 0.35, 'sine', 0.3);
+    },
+    record() { [784, 1047, 1319, 1568].forEach((f, k) => tone(f, 0.45 + k * 0.11, k === 3 ? 0.5 : 0.16, 'square', 0.12)); },
+    over() { [392, 330, 262, 196].forEach((f, k) => tone(f, 0.35 + k * 0.2, 0.3, 'triangle', 0.45)); },
+  };
+  function setSound(on, quiet) {
+    soundOn = on;
+    try { localStorage.setItem('blockdoku-sound', on ? 'on' : 'off'); } catch {}
+    $('sound').textContent = on ? 'Ton an' : 'Ton aus';
+    $('sound').setAttribute('aria-pressed', on);
+    if (on && !quiet) sfx.pick();
+  }
+
   // --- State ---
-  let board, tray, score, streak, over;
+  let board, tray, score, streak, over, recordStart;
   let best = 0;
   try { best = +localStorage.getItem('blockdoku-best') || 0; } catch {}
 
@@ -193,7 +251,7 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
 
   function newGame() {
     board = Array(N * N).fill(0);
-    score = 0; streak = 0; over = false;
+    score = 0; streak = 0; over = false; recordStart = best;
     dealTray();
     render();
   }
@@ -275,6 +333,7 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
     fl.style.gap = (g.step - g.size) + 'px';
     document.body.appendChild(fl);
     slot.classList.add('dragging');
+    sfx.pick();
     // On touch, lift the piece above the finger so it stays visible.
     const lift = e.pointerType === 'mouse' ? 0 : g.step * 1.6;
     drag = { i, s, slot, fl, g, w: w * g.step, h: h * g.step, lift, target: null };
@@ -303,7 +362,7 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
     const { i, s, fl, slot, target } = drag;
     fl.remove(); slot.classList.remove('dragging');
     drag = null;
-    if (target === null) { render(); return; }
+    if (target === null) { sfx.back(); render(); return; }
     place(i, s, Math.floor(target / N), target % N);
   }
 
@@ -322,9 +381,13 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
     }
     score += pts;
     tray[i] = null;
-    if (tray.every(t => !t)) dealTray();
-    if (!tray.some(t => t && canPlaceAnywhere(t))) over = true;
+    sfx.place();
+    if (units.length) sfx.clear(units.length, streak);
+    if (tray.every(t => !t)) { dealTray(); sfx.deal(); }
+    if (!tray.some(t => t && canPlaceAnywhere(t))) { over = true; sfx.over(); }
+    const firstRecord = recordStart > 0 && best <= recordStart && score > recordStart;
     if (score > best) { best = score; try { localStorage.setItem('blockdoku-best', best); } catch {} }
+    if (firstRecord) { sfx.record(); setTimeout(() => toast('Neuer Rekord!'), 700); }
     render();
     cleared.forEach(k => cells[k].classList.add('pop'));
     if (units.length) toast(`+${pts}` + (streak > 1 ? `  Combo ×${streak}` : ''));
@@ -334,15 +397,18 @@ button:focus-visible, .slot:focus-visible { outline: 3px solid var(--good); outl
   addEventListener('pointerup', endDrag);
   addEventListener('pointercancel', endDrag);
   addEventListener('resize', () => !drag && render());
-  $('restart').addEventListener('click', newGame);
-  $('again').addEventListener('click', newGame);
+  const restart = () => { newGame(); sfx.deal(); };
+  $('restart').addEventListener('click', restart);
+  $('again').addEventListener('click', restart);
+  $('sound').addEventListener('click', () => setSound(!soundOn));
+  setSound(soundOn, true);
 
   // Keep a running game across live updates of the page.
   const start = data => {
-    if (data && data.board) { ({ board, tray, score, streak, over } = data); render(); }
+    if (data && data.board) { ({ board, tray, score, streak, over } = data); recordStart = data.recordStart ?? best; render(); }
     else newGame();
   };
-  window.claude?.hot?.snapshot?.(() => ({ board, tray, score, streak, over }));
+  window.claude?.hot?.snapshot?.(() => ({ board, tray, score, streak, over, recordStart }));
   window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
